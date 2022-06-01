@@ -1,20 +1,22 @@
-#include <iostream>
-#include <cstdio>
-#include <fcntl.h>
-#include <unistd.h>
-#include <cctype>
-#include "Producer.h"
-#include "BQ.h"
-#include <vector>
-#include "mutex"
+#include "ex3.h"
 
-#define SIZE 150
-using namespace std;
+void *produce(void *arg) {
+    Producer p = *((Producer*) arg);
+    string categories[3] = {"SPORTS", "NEWS", "WEATHER"};
+    int productNum = p.getProducts(), id = p.getId();
+    BQ* bq = p.getBQ();
+    printf("Producer id %d", id);
+    for (int i = 0; i < productNum; ++i) {
+        string msg = to_string(id) + categories[i % 3] + to_string(productNum);
 
-vector<BQ *> queues;
+        while (bq->enqueue(msg) < 0);
+
+    }
+    return nullptr;
+}
 
 int main(int argc, char *argv[]) {
-    int conf, coEditorBufSize, numProducers = 0;
+    int conf, coEditorBufSize = 0, numProducers = 0;
     vector<Producer *> Producers;
     char buf[SIZE];
     unsigned int charsRead;
@@ -150,6 +152,21 @@ int main(int argc, char *argv[]) {
         tmp[k] = '\0';
         coEditorBufSize = stoi(tmp);
     }
+
+    if (coEditorBufSize > 0) {
+        editorsBQ = new BQ(coEditorBufSize);
+    }
+
+    pthread_t pthreads[numProducers];
+    int err;
+    for (int j = 0; j < numProducers; ++j) {
+        err = pthread_create(&pthreads[j], nullptr, produce, (void *) Producers[j]);
+        if (err != 0) {
+            perror("pthread create failed");
+        }
+        
+    }
+
 
 
 }

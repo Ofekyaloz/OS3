@@ -11,7 +11,7 @@ class BQ {
 
 public:
     BQ(int max_size);
-    void enqueue(string s);
+    int enqueue(string s);
 
     string dequeue();
 

@@ -3,4 +3,4 @@ project(untitled)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(untitled ex3.cpp BQ.cpp BQ.h UBQ.cpp UBQ.h Producer.cpp Producer.h)
+add_executable(untitled ex3.cpp BQ.cpp BQ.h UBQ.cpp UBQ.h Producer.cpp Producer.h Dispatcher.cpp Dispatcher.h ex3.h Co_Editor.cpp Co_Editor.h)

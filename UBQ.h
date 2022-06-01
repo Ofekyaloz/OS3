@@ -15,7 +15,7 @@ class UBQ {
 
 public:
     UBQ(int max_size);
-    void enqueue(string s);
+    int enqueue(string s);
 
     string dequeue();
 
