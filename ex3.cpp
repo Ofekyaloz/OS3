@@ -1,16 +1,54 @@
 #include "ex3.h"
 
 void *produce(void *arg) {
-    Producer p = *((Producer*) arg);
+    Producer p = *((Producer *) arg);
     string categories[3] = {"SPORTS", "NEWS", "WEATHER"};
     int productNum = p.getProducts(), id = p.getId();
-    BQ* bq = p.getBQ();
+    BQ *bq = p.getBQ();
     printf("Producer id %d", id);
     for (int i = 0; i < productNum; ++i) {
         string msg = to_string(id) + categories[i % 3] + to_string(productNum);
 
         while (bq->enqueue(msg) < 0);
 
+    }
+    return nullptr;
+}
+
+void *dispatcher(void *arg) {
+    int q_num = *((int *) arg);
+    while (true) {
+        for (BQ *bq: queues) {
+            if (bq == nullptr) {
+                q_num--;
+                continue;
+            }
+            string msg = bq->dequeue();
+            if (msg.find("SPORTS") != string::npos) {
+                sportsUBQ->enqueue(msg);
+            } else if (msg.find("NEWS") != string::npos) {
+                newsUBQ->enqueue(msg);
+            } else if (msg.find("WEATHER") != string::npos) {
+                weatherUBQ->enqueue(msg);
+
+            }
+        }
+        if (q_num == 0) {
+            break;
+        }
+    }
+    return nullptr;
+}
+
+void *co_editor(void *arg) {
+    UBQ ubq = *((UBQ*) arg);
+    while (true) {
+        string msg = ubq.dequeue();
+        if (msg.find("DONE") != string::npos) {
+            break;
+        }
+        sleep(0.1); // edits...
+        editorsBQ->enqueue(msg);
     }
     return nullptr;
 }
@@ -108,18 +146,16 @@ int main(int argc, char *argv[]) {
         }
 
         // create producer
-        Producers.push_back(new Producer(producerID, productsNum, qSize));
+        Producer *p = new Producer(producerID, productsNum, qSize);
+        Producers.push_back(p);
         numProducers++;
-        queues.push_back(new BQ(qSize));
+        queues.push_back(p->getBQ());
         canRead++;
     }
 
     string string2 = "Co-Editor queue size = ";
     unsigned int i, len = string2.size(), same = 1;
-    for (
-            i = 0;
-            i < len;
-            ++i, ++canRead) {
+    for (i = 0; i < len; ++i, ++canRead) {
         if (canRead == SIZE - 1) {
             canRead = 0;
             charsRead = read(conf, buf, SIZE);
@@ -157,16 +193,38 @@ int main(int argc, char *argv[]) {
         editorsBQ = new BQ(coEditorBufSize);
     }
 
-    pthread_t pthreads[numProducers];
+
     int err;
+    pthread_t dispatcher_t;
+    err = pthread_create(&dispatcher_t, nullptr, dispatcher, (void *) &numProducers);
+    if (err != 0) {
+        perror("pthread create failed");
+    }
+
+    pthread_t editors[3];
+    for (int j = 0; j < 3; ++j) {
+        UBQ* ubq;
+        if (j == 0) {
+            ubq = sportsUBQ;
+        } else if (j == 1) {
+            ubq = newsUBQ;
+        } else {
+            ubq = weatherUBQ;
+        }
+        err = pthread_create(&editors[j], nullptr, co_editor, (void *) ubq);
+        if (err != 0) {
+            perror("pthread create failed");
+        }
+    }
+
+    pthread_t pthreads[numProducers];
     for (int j = 0; j < numProducers; ++j) {
         err = pthread_create(&pthreads[j], nullptr, produce, (void *) Producers[j]);
         if (err != 0) {
             perror("pthread create failed");
         }
-        
-    }
 
+    }
 
 
 }

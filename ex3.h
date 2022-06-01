@@ -23,9 +23,9 @@ vector<BQ *> queues;
 
 BQ* editorsBQ;
 
-UBQ* sportsUBQ = new UBQ(10);
-UBQ* newsUBQ = new UBQ(10);
-UBQ* weatherUBQ = new UBQ(10);
+UBQ* sportsUBQ = new UBQ();
+UBQ* newsUBQ = new UBQ();
+UBQ* weatherUBQ = new UBQ();
 
 
 #endif //UNTITLED_EX3_H
