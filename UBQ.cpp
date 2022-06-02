@@ -2,7 +2,6 @@
 // Created by ofek on 5/30/22.
 //
 
-#include <iostream>
 #include "UBQ.h"
 
 UBQ::UBQ() {
@@ -14,7 +13,7 @@ UBQ::UBQ() {
     this->_size = 0;
 }
 
-int UBQ::enqueue(string s) {
+int UBQ::enqueue(const string& s) {
     sops->sem_op = -1;
     semop(semid, sops, 1);
 

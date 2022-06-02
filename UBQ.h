@@ -18,7 +18,7 @@ class UBQ {
 
 public:
     UBQ();
-    int enqueue(string s);
+    int enqueue(const string& s);
 
     string dequeue();
 

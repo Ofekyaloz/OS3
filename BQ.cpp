@@ -1,8 +1,8 @@
-#include <iostream>
 #include "BQ.h"
 
 BQ::BQ(int max_size) {
     this->_max_size = max_size;
+    this->_size = 0;
     semid = semget((__key_t) 0, 1, 0600);
     semarg.val = 1;
     semctl(semid, 0, SETVAL, semarg);
@@ -11,7 +11,7 @@ BQ::BQ(int max_size) {
 }
 
 
-int BQ::enqueue(string s) {
+int BQ::enqueue(const string& s) {
     if (this->_size == this->_max_size) {
         return -1;
     }

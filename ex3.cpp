@@ -8,26 +8,28 @@ void *produce(void *arg) {
     for (int i = 0; i < productNum; ++i) {
         string msg = to_string(id) + " " + categories[i % 3] + " " + to_string(i);
         while (bq->enqueue(msg) < 0) {
-            sleep(0.1);
+            usleep(10000);
         }
-        sleep(0.5);
+        usleep(10000);
     }
     while (bq->enqueue("DONE") < 0) {
-        sleep(0.1);
+        usleep(10000);
     }
-    cout << "producer DONE" << endl;
 
     return nullptr;
 }
 
 void *dispatcher(void *arg) {
     while (!queues.empty()) {
-        for (BQ *bq: queues) {
-            sleep(0.5);
+        vector<BQ *> queues_copy;
+        for (BQ *q: queues) {
+            queues_copy.push_back(q);
+        }
+        usleep(10000);
+        for (BQ *bq: queues_copy) {
+            usleep(20000);
             string msg = bq->dequeue();
-            if (!msg.empty()) {
-//                cout << "dispatcher: " << msg << endl;
-            }
+
             if (msg.find("SPORTS") != string::npos) {
                 sportsUBQ->enqueue(msg);
             } else if (msg.find("NEWS") != string::npos) {
@@ -35,7 +37,6 @@ void *dispatcher(void *arg) {
             } else if (msg.find("WEATHER") != string::npos) {
                 weatherUBQ->enqueue(msg);
             } else if (msg.find("DONE") != string::npos) {
-//                cout << "dispatcher found DONE" << endl;
                 int index = 0;
                 for (BQ *q: queues) {
                     if (q == bq)
@@ -43,10 +44,9 @@ void *dispatcher(void *arg) {
                     index++;
                 }
                 queues.erase(queues.begin() + index);
-//                cout << "del q" << endl;
             }
         }
-        sleep(0.1);
+        usleep(10000);
     }
     string msg = "DONE";
     sportsUBQ->enqueue(msg);
@@ -59,17 +59,17 @@ void *dispatcher(void *arg) {
 void *co_editor(void *arg) {
     UBQ* ubq = ((UBQ *) arg);
     while (true) {
-        sleep(0.1);
+        usleep(10000);
         string msg = ubq->dequeue();
         if (msg.find("DONE") != string::npos) {
             break;
         }
         if (msg.empty())
             continue;
-//        cout << "co-editor " << msg << endl;
-        sleep(0.1); // edits...
-//        cout << "edit:" << msg << endl;
-        editorsBQ->enqueue(msg);
+        usleep(10000); // edits...
+        while (editorsBQ->enqueue(msg) < 0) {
+            usleep(20000);
+        }
     }
     editorsBQ->enqueue("DONE");
     return nullptr;
@@ -81,12 +81,12 @@ void *screen_manager(void *arg) {
         string msg = editorsBQ->dequeue();
         if (msg.find("DONE") != string::npos) {
             done--;
-//            cout << "manger done: " << done << endl;
         } else if (!msg.empty()){
             cout << "screen manager: " << msg << endl;
         }
-        sleep(0.1);
+        usleep(20000);
     }
+    return nullptr;
 }
 
 int main(int argc, char *argv[]) {
@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
         }
 
         // create producer
-        Producer *p = new Producer(producerID, productsNum, qSize);
+        auto *p = new Producer(producerID, productsNum, qSize);
         Producers.push_back(p);
         numProducers++;
         queues.push_back(p->getBQ());
@@ -232,6 +232,15 @@ int main(int argc, char *argv[]) {
 
     int err;
     pthread_t dispatcher_t;
+    pthread_t pthreads[numProducers];
+    for (int j = 0; j < numProducers; ++j) {
+        err = pthread_create(&pthreads[j], nullptr, produce, (void *) Producers[j]);
+        if (err != 0) {
+            perror("pthread create failed");
+        }
+
+    }
+
     err = pthread_create(&dispatcher_t, nullptr, dispatcher, nullptr);
     if (err != 0) {
         perror("pthread create failed");
@@ -259,22 +268,6 @@ int main(int argc, char *argv[]) {
         perror("pthread create failed");
     }
 
-
-    pthread_t pthreads[numProducers];
-    for (int j = 0; j < numProducers; ++j) {
-        err = pthread_create(&pthreads[j], nullptr, produce, (void *) Producers[j]);
-        if (err != 0) {
-            perror("pthread create failed");
-        }
-
-    }
-
     void* retval;
-    for (int j = 0; j < numProducers; ++j) {
-        pthread_join(pthreads[j], &retval);
-//        cout << j << " done" << endl;
-    }
-    pthread_join(manager, &retval);
-//    cout << "dispatcher done" << endl;
     pthread_join(manager, &retval);
 }
