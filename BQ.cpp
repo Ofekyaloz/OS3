@@ -1,3 +1,4 @@
+#include <iostream>
 #include "BQ.h"
 
 BQ::BQ(int max_size) {
@@ -40,8 +41,6 @@ string BQ::dequeue() {
 
         return tmp;
     }
-    return nullptr;
-}
-
+    return "";
 }
 

@@ -2,6 +2,7 @@
 // Created by ofek on 5/30/22.
 //
 
+#include <iostream>
 #include "UBQ.h"
 
 UBQ::UBQ() {
@@ -10,6 +11,7 @@ UBQ::UBQ() {
     semctl(semid, 0, SETVAL, semarg);
     sops->sem_num = 0;
     sops->sem_flg = 0;
+    this->_size = 0;
 }
 
 int UBQ::enqueue(string s) {
@@ -17,6 +19,7 @@ int UBQ::enqueue(string s) {
     semop(semid, sops, 1);
 
     this->queue.push_back(s);
+    this->_size++;
 
     sops->sem_op = 1;
     semop(semid, sops, 1);
@@ -30,14 +33,14 @@ string UBQ::dequeue() {
         semop(semid, sops, 1);
 
         string tmp = this->queue.front();
-         this->queue.erase(queue.begin());
-         this->_size--;
+        this->queue.erase(queue.begin());
+        this->_size--;
 
         sops->sem_op = 1;
         semop(semid, sops, 1);
 
         return tmp;
     }
-    return nullptr;
+    return "";
 }
 

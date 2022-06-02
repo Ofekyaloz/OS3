@@ -18,15 +18,12 @@ class Producer {
 public:
     Producer(int id, int products_num, int buf_size);
 
-    void* Produce(void *args);
-
     int getId();
 
     int getProducts();
 
     BQ* getBQ();
 
-    ~Producer();
 };
 
 

@@ -5,52 +5,88 @@ void *produce(void *arg) {
     string categories[3] = {"SPORTS", "NEWS", "WEATHER"};
     int productNum = p.getProducts(), id = p.getId();
     BQ *bq = p.getBQ();
-    printf("Producer id %d", id);
     for (int i = 0; i < productNum; ++i) {
-        string msg = to_string(id) + categories[i % 3] + to_string(productNum);
-
-        while (bq->enqueue(msg) < 0);
-
+        string msg = to_string(id) + " " + categories[i % 3] + " " + to_string(i);
+        while (bq->enqueue(msg) < 0) {
+            sleep(0.1);
+        }
+        sleep(0.5);
     }
+    while (bq->enqueue("DONE") < 0) {
+        sleep(0.1);
+    }
+    cout << "producer DONE" << endl;
+
     return nullptr;
 }
 
 void *dispatcher(void *arg) {
-    int q_num = *((int *) arg);
-    while (true) {
+    while (!queues.empty()) {
         for (BQ *bq: queues) {
-            if (bq == nullptr) {
-                q_num--;
-                continue;
-            }
+            sleep(0.5);
             string msg = bq->dequeue();
+            if (!msg.empty()) {
+//                cout << "dispatcher: " << msg << endl;
+            }
             if (msg.find("SPORTS") != string::npos) {
                 sportsUBQ->enqueue(msg);
             } else if (msg.find("NEWS") != string::npos) {
                 newsUBQ->enqueue(msg);
             } else if (msg.find("WEATHER") != string::npos) {
                 weatherUBQ->enqueue(msg);
-
+            } else if (msg.find("DONE") != string::npos) {
+//                cout << "dispatcher found DONE" << endl;
+                int index = 0;
+                for (BQ *q: queues) {
+                    if (q == bq)
+                        break;
+                    index++;
+                }
+                queues.erase(queues.begin() + index);
+//                cout << "del q" << endl;
             }
         }
-        if (q_num == 0) {
-            break;
-        }
+        sleep(0.1);
     }
+    string msg = "DONE";
+    sportsUBQ->enqueue(msg);
+    newsUBQ->enqueue(msg);
+    weatherUBQ->enqueue(msg);
+
     return nullptr;
 }
 
 void *co_editor(void *arg) {
-    UBQ ubq = *((UBQ*) arg);
+    UBQ* ubq = ((UBQ *) arg);
     while (true) {
-        string msg = ubq.dequeue();
+        sleep(0.1);
+        string msg = ubq->dequeue();
         if (msg.find("DONE") != string::npos) {
             break;
         }
+        if (msg.empty())
+            continue;
+//        cout << "co-editor " << msg << endl;
         sleep(0.1); // edits...
+//        cout << "edit:" << msg << endl;
         editorsBQ->enqueue(msg);
     }
+    editorsBQ->enqueue("DONE");
     return nullptr;
+}
+
+void *screen_manager(void *arg) {
+    int done = 3;
+    while (done) {
+        string msg = editorsBQ->dequeue();
+        if (msg.find("DONE") != string::npos) {
+            done--;
+//            cout << "manger done: " << done << endl;
+        } else if (!msg.empty()){
+            cout << "screen manager: " << msg << endl;
+        }
+        sleep(0.1);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -196,14 +232,14 @@ int main(int argc, char *argv[]) {
 
     int err;
     pthread_t dispatcher_t;
-    err = pthread_create(&dispatcher_t, nullptr, dispatcher, (void *) &numProducers);
+    err = pthread_create(&dispatcher_t, nullptr, dispatcher, nullptr);
     if (err != 0) {
         perror("pthread create failed");
     }
 
     pthread_t editors[3];
     for (int j = 0; j < 3; ++j) {
-        UBQ* ubq;
+        UBQ *ubq;
         if (j == 0) {
             ubq = sportsUBQ;
         } else if (j == 1) {
@@ -217,6 +253,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    pthread_t manager;
+    err = pthread_create(&manager, nullptr, screen_manager, nullptr);
+    if (err != 0) {
+        perror("pthread create failed");
+    }
+
+
     pthread_t pthreads[numProducers];
     for (int j = 0; j < numProducers; ++j) {
         err = pthread_create(&pthreads[j], nullptr, produce, (void *) Producers[j]);
@@ -226,5 +269,12 @@ int main(int argc, char *argv[]) {
 
     }
 
-
+    void* retval;
+    for (int j = 0; j < numProducers; ++j) {
+        pthread_join(pthreads[j], &retval);
+//        cout << j << " done" << endl;
+    }
+    pthread_join(manager, &retval);
+//    cout << "dispatcher done" << endl;
+    pthread_join(manager, &retval);
 }
