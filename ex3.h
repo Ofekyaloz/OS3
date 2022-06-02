@@ -1,7 +1,3 @@
-//
-// Created by ofek on 6/1/22.
-//
-
 #ifndef UNTITLED_EX3_H
 #define UNTITLED_EX3_H
 
@@ -16,7 +12,6 @@
 #include "mutex"
 #include "UBQ.h"
 
-#define SIZE 150
 using namespace std;
 
 vector<BQ *> queues;

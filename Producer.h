@@ -1,7 +1,3 @@
-//
-// Created by ofek on 5/30/22.
-//
-
 #ifndef UNTITLED_PRODUCER_H
 #define UNTITLED_PRODUCER_H
 #include <string>

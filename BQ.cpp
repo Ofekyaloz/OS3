@@ -12,15 +12,20 @@ BQ::BQ(int max_size) {
 
 
 int BQ::enqueue(const string &s) {
+
+    // if the queue is full return -1
     if (this->_size == this->_max_size) {
         return -1;
     }
+
+    // decrease the semaphore
     sops->sem_op = -1;
     semop(semid, sops, 1);
 
     this->queue.push_back(s);
     this->_size++;
 
+    // increase the semaphore
     sops->sem_op = 1;
     semop(semid, sops, 1);
 
@@ -28,14 +33,20 @@ int BQ::enqueue(const string &s) {
 }
 
 string BQ::dequeue() {
+
+    // checks if there is an element in the queue
     if (this->_size > 0) {
+
+        // decrease the semaphore
         sops->sem_op = -1;
         semop(semid, sops, 1);
 
+        // critical section
         string tmp = this->queue.front();
         this->queue.erase(queue.begin());
         this->_size--;
 
+        // increase the semaphore
         sops->sem_op = 1;
         semop(semid, sops, 1);
 

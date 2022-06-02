@@ -1,7 +1,3 @@
-//
-// Created by ofek on 5/30/22.
-//
-
 #ifndef UNTITLED_UBQ_H
 #define UNTITLED_UBQ_H
 #include "BQ.h"

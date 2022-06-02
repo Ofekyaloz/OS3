@@ -7,29 +7,30 @@ void *produce(void *arg) {
     BQ *bq = p.getBQ();
     for (int i = 0; i < productNum; ++i) {
         string msg = to_string(id) + " " + categories[i % 3] + " " + to_string(i);
-        while (bq->enqueue(msg) < 0) {
+
+        // trying to push the new msg. if failed go to sleep.
+        while (bq->enqueue(msg) < 0)
             usleep(10000);
-        }
-        usleep(10000);
+        usleep(1000);
     }
-    while (bq->enqueue("DONE") < 0) {
-        usleep(10000);
-    }
+    while (bq->enqueue("DONE") < 0)
+        usleep(1000);
 
     return nullptr;
 }
 
 void *dispatcher(void *arg) {
     while (!queues.empty()) {
-        vector<BQ *> queues_copy;
-        for (BQ *q: queues) {
-            queues_copy.push_back(q);
-        }
-        usleep(10000);
-        for (BQ *bq: queues_copy) {
-            usleep(20000);
-            string msg = bq->dequeue();
 
+        // copy the queues
+        vector<BQ *> queues_copy;
+        for (BQ *q: queues)
+            queues_copy.push_back(q);
+
+        for (BQ *bq: queues_copy) {
+
+            // pop a message and push it to the fit queue.
+            string msg = bq->dequeue();
             if (msg.find("SPORTS") != string::npos) {
                 sportsUBQ->enqueue(msg);
             } else if (msg.find("NEWS") != string::npos) {
@@ -37,6 +38,8 @@ void *dispatcher(void *arg) {
             } else if (msg.find("WEATHER") != string::npos) {
                 weatherUBQ->enqueue(msg);
             } else if (msg.find("DONE") != string::npos) {
+
+                // finds the queue in the queues vector and deletes it.
                 int index = 0;
                 for (BQ *q: queues) {
                     if (q == bq)
@@ -45,38 +48,46 @@ void *dispatcher(void *arg) {
                 }
                 queues.erase(queues.begin() + index);
             }
+            usleep(20000);
         }
         usleep(10000);
     }
+
+    // push DONE to the editors queue.
     string msg = "DONE";
     sportsUBQ->enqueue(msg);
     newsUBQ->enqueue(msg);
     weatherUBQ->enqueue(msg);
-
     return nullptr;
 }
 
 void *co_editor(void *arg) {
+
+    // get the right queue - sports/news/weather.
     UBQ *ubq = ((UBQ *) arg);
     while (true) {
         usleep(10000);
         string msg = ubq->dequeue();
-        if (msg.find("DONE") != string::npos) {
-            break;
-        }
         if (msg.empty())
             continue;
+
+        // if gets DONE stop reading
+        if (msg.find("DONE") != string::npos)
+            break;
+
         usleep(10000); // edits...
-        while (editorsBQ->enqueue(msg) < 0) {
+        // push to the screen manager queue the msg
+        while (editorsBQ->enqueue(msg) < 0)
             usleep(20000);
-        }
     }
+    // push DONE to the screen manager queue.
     editorsBQ->enqueue("DONE");
     return nullptr;
 }
 
 void *screen_manager(void *arg) {
     int done = 3;
+    // as long as there is a queue-editor, prints the msg
     while (done) {
         string msg = editorsBQ->dequeue();
         if (msg.find("DONE") != string::npos) {
@@ -84,17 +95,15 @@ void *screen_manager(void *arg) {
         } else if (!msg.empty()) {
             cout << "screen manager: " << msg << endl;
         }
-        usleep(20000);
+        usleep(10000);
     }
     return nullptr;
 }
 
 int main(int argc, char *argv[]) {
-    int conf, coEditorBufSize = 0, numProducers = 0, producerID, productsNum, qSize;
+    int numProducers = 0, producerID, productsNum, qSize;
     size_t len1;
     vector<Producer *> Producers;
-    char buf[SIZE];
-    unsigned int charsRead;
     if (argc < 2) {
         perror("Not enough parameters\n");
         return -1;
@@ -102,14 +111,15 @@ int main(int argc, char *argv[]) {
 
     char *line;
     FILE *file = fopen(argv[1], "r");
+
+    // reading the configuration
     while (getline(&line, &len1, file) != -1) {
         producerID = stoi(line);
 
         if (getline(&line, &len1, file) != -1) {
             productsNum = stoi(line);
         } else {
-            coEditorBufSize = producerID;
-            editorsBQ = new BQ(coEditorBufSize);
+            editorsBQ = new BQ(producerID);
             break;
         }
         if (getline(&line, &len1, file) != -1) {
@@ -125,21 +135,25 @@ int main(int argc, char *argv[]) {
     }
 
     int err;
-    pthread_t dispatcher_t;
-    pthread_t pthreads[numProducers];
+
+    // creates the producers
+    pthread_t producers_t[numProducers];
     for (int j = 0; j < numProducers; ++j) {
-        err = pthread_create(&pthreads[j], nullptr, produce, (void *) Producers[j]);
+        err = pthread_create(&producers_t[j], nullptr, produce, (void *) Producers[j]);
         if (err != 0) {
             perror("pthread create failed");
         }
 
     }
 
+    // creates the dispatcher
+    pthread_t dispatcher_t;
     err = pthread_create(&dispatcher_t, nullptr, dispatcher, nullptr);
     if (err != 0) {
         perror("pthread create failed");
     }
 
+    // creates the editors
     pthread_t editors[3];
     for (int j = 0; j < 3; ++j) {
         UBQ *ubq;
@@ -156,12 +170,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // creates the screen manager
     pthread_t manager;
     err = pthread_create(&manager, nullptr, screen_manager, nullptr);
     if (err != 0) {
         perror("pthread create failed");
     }
 
-    void *retval;
-    pthread_join(manager, &retval);
+    void *ret;
+    pthread_join(manager, &ret);
 }

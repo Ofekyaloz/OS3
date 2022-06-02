@@ -1,7 +1,3 @@
-//
-// Created by ofek on 5/30/22.
-//
-
 #include "UBQ.h"
 
 UBQ::UBQ() {
@@ -14,12 +10,14 @@ UBQ::UBQ() {
 }
 
 int UBQ::enqueue(const string& s) {
+    // decrease the semaphore
     sops->sem_op = -1;
     semop(semid, sops, 1);
 
     this->queue.push_back(s);
     this->_size++;
 
+    // increase the semaphore
     sops->sem_op = 1;
     semop(semid, sops, 1);
 
@@ -27,7 +25,11 @@ int UBQ::enqueue(const string& s) {
 }
 
 string UBQ::dequeue() {
+
+    // checks if there is an element in the queue
     if (this->_size > 0) {
+
+        // decrease the semaphore
         sops->sem_op = -1;
         semop(semid, sops, 1);
 
@@ -35,6 +37,7 @@ string UBQ::dequeue() {
         this->queue.erase(queue.begin());
         this->_size--;
 
+        // increase the semaphore
         sops->sem_op = 1;
         semop(semid, sops, 1);
 
