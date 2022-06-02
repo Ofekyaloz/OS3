@@ -57,7 +57,7 @@ void *dispatcher(void *arg) {
 }
 
 void *co_editor(void *arg) {
-    UBQ* ubq = ((UBQ *) arg);
+    UBQ *ubq = ((UBQ *) arg);
     while (true) {
         usleep(10000);
         string msg = ubq->dequeue();
@@ -81,7 +81,7 @@ void *screen_manager(void *arg) {
         string msg = editorsBQ->dequeue();
         if (msg.find("DONE") != string::npos) {
             done--;
-        } else if (!msg.empty()){
+        } else if (!msg.empty()) {
             cout << "screen manager: " << msg << endl;
         }
         usleep(20000);
@@ -90,7 +90,8 @@ void *screen_manager(void *arg) {
 }
 
 int main(int argc, char *argv[]) {
-    int conf, coEditorBufSize = 0, numProducers = 0;
+    int conf, coEditorBufSize = 0, numProducers = 0, producerID, productsNum, qSize;
+    size_t len1;
     vector<Producer *> Producers;
     char buf[SIZE];
     unsigned int charsRead;
@@ -98,137 +99,30 @@ int main(int argc, char *argv[]) {
         perror("Not enough parameters\n");
         return -1;
     }
-    if (access(argv[1], R_OK) == -1) {
-        perror("Error in: access\n");
-        return -1;
-    }
-    conf = open(argv[1], O_RDONLY);
-    if (conf == -1) {
-        perror("Error in: open\n");
-        return -1;
-    }
-    charsRead = read(conf, buf, SIZE);
-    if (charsRead == -1) {
-        perror("Error in: read\n");
-        return -1;
-    }
-    int canRead = 0;
-    while (charsRead != 0) {
-        string string1 = "PRODUCER ", string2 = "queue size = ";
-        int producerID, productsNum, qSize;
-        unsigned int i, len = string1.size(), same = 1;
-        for (i = 0; i < len; ++i, ++canRead) {
-            if (canRead == SIZE - 1) {
-                canRead = 0;
-                charsRead = read(conf, buf, SIZE);
-                if (charsRead == -1) {
-                    perror("Error in: read\n");
-                    return -1;
-                }
-            }
-            if (string1[i] != buf[canRead]) {
-                same = 0;
-                break;
-            }
-        }
-        if (!same)
+
+    char *line;
+    FILE *file = fopen(argv[1], "r");
+    while (getline(&line, &len1, file) != -1) {
+        producerID = stoi(line);
+
+        if (getline(&line, &len1, file) != -1) {
+            productsNum = stoi(line);
+        } else {
+            coEditorBufSize = producerID;
+            editorsBQ = new BQ(coEditorBufSize);
             break;
-
-        for (int j = 0; j < 3; ++j) {
-            char tmp[10];
-            int k = 0;
-            if (j == 2) {
-                len = string2.size();
-                for (int l = 0; l < len; ++l, ++canRead) {
-                    if (canRead == SIZE - 1) {
-                        canRead = 0;
-                        charsRead = read(conf, buf, SIZE);
-                        if (charsRead == -1) {
-                            perror("Error in: read\n");
-                            return -1;
-                        }
-                    }
-                    if (string2[l] != buf[canRead]) {
-                        same = 0;
-                        break;
-                    }
-                }
-                if (!same) {
-                    // add error
-                    break;
-                }
-            }
-            while (isdigit(buf[canRead])) {
-                tmp[k] = buf[canRead];
-                k++;
-                canRead++;
-                if (canRead == SIZE - 1) {
-                    canRead = 0;
-                    charsRead = read(conf, buf, SIZE);
-                    if (charsRead == -1) {
-                        perror("Error in: read\n");
-                        return -1;
-                    }
-                }
-            }
-            tmp[k] = '\0';
-            if (!j)
-                producerID = stoi(tmp);
-            else if (j == 1)
-                productsNum = stoi(tmp);
-            else if (j == 2)
-                qSize = stoi(tmp);
-            canRead++;
         }
-
-        // create producer
+        if (getline(&line, &len1, file) != -1) {
+            qSize = stoi(line);
+        }
         auto *p = new Producer(producerID, productsNum, qSize);
         Producers.push_back(p);
         numProducers++;
         queues.push_back(p->getBQ());
-        canRead++;
-    }
+        if (getline(&line, &len1, file) != -1) {
 
-    string string2 = "Co-Editor queue size = ";
-    unsigned int i, len = string2.size(), same = 1;
-    for (i = 0; i < len; ++i, ++canRead) {
-        if (canRead == SIZE - 1) {
-            canRead = 0;
-            charsRead = read(conf, buf, SIZE);
-            if (charsRead == -1) {
-                perror("Error in: read\n");
-                return -1;
-            }
-        }
-        if (string2[i] != buf[canRead]) {
-            same = 0;
-            break;
         }
     }
-    if (same) {
-        char tmp[10];
-        int k = 0;
-        while (isdigit(buf[canRead])) {
-            tmp[k] = buf[canRead];
-            k++;
-            canRead++;
-            if (canRead == SIZE - 1) {
-                canRead = 0;
-                charsRead = read(conf, buf, SIZE);
-                if (charsRead == -1) {
-                    perror("Error in: read\n");
-                    return -1;
-                }
-            }
-        }
-        tmp[k] = '\0';
-        coEditorBufSize = stoi(tmp);
-    }
-
-    if (coEditorBufSize > 0) {
-        editorsBQ = new BQ(coEditorBufSize);
-    }
-
 
     int err;
     pthread_t dispatcher_t;
@@ -268,6 +162,6 @@ int main(int argc, char *argv[]) {
         perror("pthread create failed");
     }
 
-    void* retval;
+    void *retval;
     pthread_join(manager, &retval);
 }

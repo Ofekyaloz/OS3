@@ -11,7 +11,7 @@ BQ::BQ(int max_size) {
 }
 
 
-int BQ::enqueue(const string& s) {
+int BQ::enqueue(const string &s) {
     if (this->_size == this->_max_size) {
         return -1;
     }
